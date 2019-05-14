@@ -19,7 +19,7 @@ package persistentvolume
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,6 +67,11 @@ const (
 	// provisioned. Its value is name of volume plugin that is supposed to provision
 	// a volume for this PVC.
 	AnnStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
+
+	// AnnMembershipHash annotation is added to a PVC that is created by a StatefulSet
+	// so that PVCs may be associated with one other.  Its value is the
+	// (TODO: what kind of) hash of the Namespace + Name of the StatefulSet.
+	AnnMembershipHash = "volume.alpha.kubernetes.io/membership-hash"
 )
 
 // IsDelayBindingMode checks if claim is in delay binding mode.

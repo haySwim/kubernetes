@@ -18,13 +18,14 @@ package statefulset
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -32,6 +33,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
+	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 )
 
 // maxUpdateRetries is the maximum number of retries used for update conflict resolution prior to failure
@@ -99,6 +101,24 @@ func getPodName(set *apps.StatefulSet, ordinal int) string {
 func getPersistentVolumeClaimName(set *apps.StatefulSet, claim *v1.PersistentVolumeClaim, ordinal int) string {
 	// NOTE: This name format is used by the heuristics for zone spreading in ChooseZoneForVolume
 	return fmt.Sprintf("%s-%s-%d", claim.Name, set.Name, ordinal)
+}
+
+func setMembershipAnnotation(set *apps.StatefulSet, claim *v1.PersistentVolumeClaim) {
+	membershipHash := getStatefulSetMembershipHash(set)
+	if val, ok := claim.Annotations[pvutil.AnnMembershipHash]; ok && val == membershipHash {
+		// annotation is already set, nothing to do
+		return
+	}
+
+	metav1.SetMetaDataAnnotation(&claim.ObjectMeta, pvutil.AnnMembershipHash, membershipHash)
+}
+
+func getStatefulSetMembershipHash(set *apps.StatefulSet) string {
+	// TODO: Is this an acceptable way to generate this?
+	h := sha1.New()
+	h.Write([]byte(set.ObjectMeta.Namespace + set.ObjectMeta.Name))
+
+	return fmt.Sprintf("%x", (h.Sum(nil)))
 }
 
 // isMemberOf tests if pod is a member of set.
